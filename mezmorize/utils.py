@@ -8,7 +8,7 @@
     Provides mezmorize utility functions
 """
 from os import getenv, path as p
-from subprocess import call
+from subprocess import call, DEVNULL
 from copy import copy
 
 try:
@@ -93,7 +93,7 @@ HEROKU_PROCESSES = {
 def pgrep(process):
     envs = HEROKU_PROCESSES.get(process, [])
     any_env = HEROKU and any(map(getenv, envs))
-    return any_env or call(['pgrep', process]) == 0
+    return any_env or call(['pgrep', process], stdout=DEVNULL) == 0
 
 
 HAS_MEMCACHE = (pylibmc or pymemcache or bmemcached) and pgrep('memcache')
