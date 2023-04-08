@@ -18,6 +18,7 @@ import warnings
 from importlib import import_module
 from functools import partial, wraps
 from inspect import getfullargspec
+from logging import Logger
 
 from cachelib.memcached import _test_memcached_key
 
@@ -98,7 +99,7 @@ class Cache(object):
     """
     This class is used to control the cache objects.
     """
-    def __init__(self, namespace=None, **config):
+    def __init__(self, logger=None, namespace=None, **config):
         config.setdefault('CACHE_DEFAULT_TIMEOUT', DEF_DEFAULT_TIMEOUT)
         config.setdefault('CACHE_THRESHOLD', DEF_THRESHOLD)
         config.setdefault('CACHE_KEY_PREFIX', 'mezmorize_')
@@ -387,8 +388,15 @@ class Cache(object):
                 if callable(unless) and unless():  # bypass cache
                     return f(*args, **kwargs)
 
-                cache_key = decorated.make_cache_key(f, *args, **kwargs)
-                value = self.cache.get(cache_key)
+                try:
+                    cache_key = decorated.make_cache_key(f, *args, **kwargs)
+                    value = self.cache.get(cache_key)
+                except Exception as get_exception:
+                    if logger:
+                        logger.error("Error possibly on the cache backend.")
+                        logger.exception(get_exception)
+
+                    return f(*args, **kwargs)
 
                 if value is None:
                     value = f(*args, **kwargs)
@@ -396,7 +404,12 @@ class Cache(object):
 
                     # value is first for addCallback compatibility
                     def set_cache(value, key):
-                        self.cache.set(key, value, **ckwargs)
+                        try:
+                            self.cache.set(key, value, **ckwargs)
+                        except Exception as set_exception:
+                            if logger:
+                                logger.error("Error possibly on the cache backend.")
+                                logger.exception(set_exception)
                         return value
 
                     try:
